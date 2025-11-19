@@ -1,8 +1,10 @@
 #pragma once
 
 #include <project/scene_strategy.hpp>
+#include <project/ecs_components.hpp>
+#include <project/ecs_systems.hpp>
+#include <entt/entt.hpp>
 #include <raylib.h>
-#include <vector>
 
 // Forward declarations for Bullet Physics
 class btDiscreteDynamicsWorld;
@@ -10,13 +12,10 @@ class btCollisionDispatcher;
 class btDbvtBroadphase;
 class btSequentialImpulseConstraintSolver;
 class btDefaultCollisionConfiguration;
-class btRigidBody;
-class btCollisionShape;
-class btDefaultMotionState;
 
 namespace project {
 
-/// Scene demonstrating Bullet Physics integration with raylib
+/// Scene demonstrating Bullet Physics integration with raylib using ECS
 /// Features falling boxes, a ground plane, and real-time physics simulation
 class BulletPhysicsScene : public SceneStrategy {
 public:
@@ -31,11 +30,14 @@ public:
     
     void update() override;
     void draw() const override;
-    [[nodiscard]] const char* getName() const override { return "Bullet Physics Scene"; }
+    [[nodiscard]] const char* getName() const override { return "Bullet Physics Scene (ECS)"; }
     void initialize() override;
     void cleanup() override;
 
 private:
+    // ECS registry
+    entt::registry registry;
+    
     // Bullet Physics world components
     btDiscreteDynamicsWorld* dynamicsWorld{nullptr};
     btCollisionDispatcher* dispatcher{nullptr};
@@ -43,19 +45,6 @@ private:
     btSequentialImpulseConstraintSolver* constraintSolver{nullptr};
     btDefaultCollisionConfiguration* collisionConfiguration{nullptr};
     
-    // Physics objects
-    struct PhysicsObject {
-        btRigidBody* rigidBody{nullptr};
-        btCollisionShape* collisionShape{nullptr};
-        btDefaultMotionState* motionState{nullptr};
-        Model model{};
-        bool hasModel{false};
-        Color color{WHITE};
-    };
-    
-    std::vector<PhysicsObject> physicsObjects;
-    Model groundModel{};
-    bool hasGroundModel{false};
     bool isInitialized{false};
     
     // Helper functions
@@ -63,6 +52,25 @@ private:
     void createGroundPlane();
     void createFallingBoxes();
     void cleanupPhysicsWorld();
+    
+    /// Helper to create a physics entity with all necessary components
+    /// @param position Initial position
+    /// @param collisionShape Bullet collision shape (ownership transferred)
+    /// @param mass Mass of the body (0 for static)
+    /// @param hasModel Whether a model is provided
+    /// @param model Raylib model (only used if hasModel is true)
+    /// @param color Color for rendering
+    /// @param isGround Whether this is a ground entity
+    /// @return The created entity
+    entt::entity createPhysicsEntity(
+        const Vector3& position,
+        btCollisionShape* collisionShape,
+        float mass,
+        bool hasModel,
+        const Model& model,
+        const Color& color,
+        bool isGround
+    );
 };
 
 } // namespace project

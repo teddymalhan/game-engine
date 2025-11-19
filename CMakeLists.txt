@@ -286,16 +286,40 @@ if(APPLE)
   else()
     message(WARNING "Bullet Physics not found at ${BULLET_ROOT}. Please install via: brew install bullet")
   endif()
+endif()
+
+# EnTT ECS configuration
+if(APPLE)
+  # Find EnTT via Homebrew
+  set(ENTT_ROOT "/opt/homebrew/opt/entt")
+  if(EXISTS ${ENTT_ROOT})
+    target_include_directories(
+      ${PROJECT_NAME}
+      PRIVATE
+      ${ENTT_ROOT}/include
+    )
+    
+    message(STATUS "Found EnTT at: ${ENTT_ROOT}")
+    
+    # Also add EnTT to library target if unit testing is enabled
+    if(${PROJECT_NAME}_BUILD_EXECUTABLE AND ${PROJECT_NAME}_ENABLE_UNIT_TESTING)
+      target_include_directories(
+        ${PROJECT_NAME}_LIB
+        PRIVATE
+        ${ENTT_ROOT}/include
+      )
+    endif()
+  else()
+    message(WARNING "EnTT not found at ${ENTT_ROOT}. Please install via: brew install entt")
+  endif()
 elseif(UNIX)
-  # Linux: try to find Bullet via pkg-config or standard paths
+  # Linux: try to find EnTT via pkg-config or standard paths
   find_package(PkgConfig QUIET)
   if(PkgConfig_FOUND)
-    pkg_check_modules(BULLET QUIET bullet)
-    if(BULLET_FOUND)
-      target_include_directories(${PROJECT_NAME} PRIVATE ${BULLET_INCLUDE_DIRS})
-      target_link_directories(${PROJECT_NAME} PRIVATE ${BULLET_LIBRARY_DIRS})
-      target_link_libraries(${PROJECT_NAME} PRIVATE ${BULLET_LIBRARIES})
-      message(STATUS "Found Bullet Physics via pkg-config")
+    pkg_check_modules(ENTT QUIET entt)
+    if(ENTT_FOUND)
+      target_include_directories(${PROJECT_NAME} PRIVATE ${ENTT_INCLUDE_DIRS})
+      message(STATUS "Found EnTT via pkg-config")
     endif()
   endif()
 endif()

@@ -1,7 +1,6 @@
 #include <project/bullet_physics_scene.hpp>
 #include <btBulletDynamicsCommon.h>
 #include <raymath.h>
-#include <algorithm>
 #include <cmath>
 
 namespace project {
@@ -16,12 +15,6 @@ void BulletPhysicsScene::initialize() {
     if (isInitialized) {
         return;
     }
-    
-    // Create a simple cube model for drawing
-    constexpr float kCubeSize = 1.0F;
-    Mesh cubeMesh = GenMeshCube(kCubeSize, kCubeSize, kCubeSize);
-    groundModel = LoadModelFromMesh(cubeMesh);
-    hasGroundModel = IsModelValid(groundModel);
     
     setupPhysicsWorld();
     createGroundPlane();
@@ -38,20 +31,20 @@ void BulletPhysicsScene::cleanup() {
     // Mark as uninitialized first to prevent re-entry
     isInitialized = false;
     
-    // Unload models (but don't clear physicsObjects yet - cleanupPhysicsWorld needs them)
-    for (auto& obj : physicsObjects) {
-        if (obj.hasModel) {
-            UnloadModel(obj.model);
-            obj.hasModel = false;
+    // Cleanup all entities - components will handle their own cleanup
+    // First remove all rigid bodies from the physics world
+    auto physicsView = registry.view<PhysicsBody>();
+    for (auto entity : physicsView) {
+        const auto& physicsBody = physicsView.get<PhysicsBody>(entity);
+        if (physicsBody.rigidBody != nullptr && dynamicsWorld != nullptr) {
+            dynamicsWorld->removeRigidBody(physicsBody.rigidBody);
         }
     }
     
-    if (hasGroundModel) {
-        UnloadModel(groundModel);
-        hasGroundModel = false;
-    }
+    // Clear the registry (this will destroy all entities and components)
+    registry.clear();
     
-    // Cleanup physics world (this will remove rigid bodies from world and delete everything)
+    // Cleanup physics world
     cleanupPhysicsWorld();
 }
 
@@ -76,9 +69,9 @@ void BulletPhysicsScene::setupPhysicsWorld() {
         collisionConfiguration
     );
     
-    // Set gravity (Y-axis down in Bullet, but we'll use Y-axis up like raylib)
-    // Raylib uses Y-up, Bullet uses Y-up by default, so we set gravity to -9.8 in Y
-    dynamicsWorld->setGravity(btVector3(0.0, -9.8, 0.0));
+    // Set gravity (Y-axis up in raylib, Y-axis up in Bullet by default)
+    constexpr float kGravity = -9.8F;
+    dynamicsWorld->setGravity(btVector3(0.0F, kGravity, 0.0F));
 }
 
 void BulletPhysicsScene::createGroundPlane() {
@@ -88,39 +81,36 @@ void BulletPhysicsScene::createGroundPlane() {
     constexpr float kGroundHalfExtentsZ = 20.0F;
     constexpr float kGroundY = -0.5F;
     
+    // Create collision shape
     btCollisionShape* groundShape = new btBoxShape(
         btVector3(kGroundHalfExtentsX, kGroundHalfExtentsY, kGroundHalfExtentsZ)
     );
     
-    btTransform groundTransform;
-    groundTransform.setIdentity();
-    groundTransform.setOrigin(btVector3(0.0, kGroundY, 0.0));
+    // Create ground model
+    constexpr float kCubeSize = 1.0F;
+    Mesh cubeMesh = GenMeshCube(kCubeSize, kCubeSize, kCubeSize);
+    Model groundModel = LoadModelFromMesh(cubeMesh);
+    const bool hasGroundModel = IsModelValid(groundModel);
     
-    btScalar mass = 0.0; // Static object (mass = 0)
-    btVector3 localInertia(0.0, 0.0, 0.0);
+    // Create ground entity
+    const Vector3 groundPosition{0.0F, kGroundY, 0.0F};
+    const Vector3 groundScale{40.0F, 1.0F, 40.0F};
     
-    btDefaultMotionState* groundMotionState = new btDefaultMotionState(groundTransform);
-    btRigidBody::btRigidBodyConstructionInfo groundRigidBodyCI(
-        mass,
-        groundMotionState,
+    auto groundEntity = createPhysicsEntity(
+        groundPosition,
         groundShape,
-        localInertia
+        0.0F,  // Static (mass = 0)
+        hasGroundModel,
+        groundModel,
+        DARKGREEN,
+        true  // isGround
     );
     
-    btRigidBody* groundRigidBody = new btRigidBody(groundRigidBodyCI);
-    dynamicsWorld->addRigidBody(groundRigidBody);
-    
-    // Store ground in physics objects (for cleanup)
-    PhysicsObject groundObj;
-    groundObj.rigidBody = groundRigidBody;
-    groundObj.collisionShape = groundShape;
-    groundObj.motionState = groundMotionState;
-    groundObj.hasModel = hasGroundModel;
-    if (hasGroundModel) {
-        groundObj.model = groundModel;
+    // Set ground scale
+    if (registry.all_of<Transform>(groundEntity)) {
+        auto& transform = registry.get<Transform>(groundEntity);
+        transform.scale = groundScale;
     }
-    groundObj.color = DARKGREEN;
-    physicsObjects.push_back(groundObj);
 }
 
 void BulletPhysicsScene::createFallingBoxes() {
@@ -130,7 +120,7 @@ void BulletPhysicsScene::createFallingBoxes() {
     constexpr float kStartHeight = 5.0F;
     constexpr float kSpacing = 2.0F;
     
-    // Create a cube mesh for the boxes
+    // Create a cube mesh for the boxes (shared mesh)
     Mesh cubeMesh = GenMeshCube(kBoxSize * 2.0F, kBoxSize * 2.0F, kBoxSize * 2.0F);
     
     // Create boxes in a grid pattern
@@ -139,39 +129,16 @@ void BulletPhysicsScene::createFallingBoxes() {
     
     for (int i = 0; i < kGridSize && boxIndex < kBoxCount; ++i) {
         for (int j = 0; j < kGridSize && boxIndex < kBoxCount; ++j) {
+            // Calculate position
+            const float posX = (static_cast<float>(i) - static_cast<float>(kGridSize) / 2.0F) * kSpacing;
+            const float posZ = (static_cast<float>(j) - static_cast<float>(kGridSize) / 2.0F) * kSpacing;
+            
             // Create collision shape
             btCollisionShape* boxShape = new btBoxShape(
                 btVector3(kBoxSize, kBoxSize, kBoxSize)
             );
             
-            // Calculate position
-            const float posX = (static_cast<float>(i) - static_cast<float>(kGridSize) / 2.0F) * kSpacing;
-            const float posZ = (static_cast<float>(j) - static_cast<float>(kGridSize) / 2.0F) * kSpacing;
-            
-            btTransform boxTransform;
-            boxTransform.setIdentity();
-            boxTransform.setOrigin(btVector3(posX, kStartHeight, posZ));
-            
-            // Calculate inertia
-            btScalar mass = kBoxMass;
-            btVector3 localInertia(0.0, 0.0, 0.0);
-            boxShape->calculateLocalInertia(mass, localInertia);
-            
-            // Create motion state
-            btDefaultMotionState* boxMotionState = new btDefaultMotionState(boxTransform);
-            
-            // Create rigid body
-            btRigidBody::btRigidBodyConstructionInfo boxRigidBodyCI(
-                mass,
-                boxMotionState,
-                boxShape,
-                localInertia
-            );
-            
-            btRigidBody* boxRigidBody = new btRigidBody(boxRigidBodyCI);
-            dynamicsWorld->addRigidBody(boxRigidBody);
-            
-            // Create model
+            // Create model (each box gets its own model instance)
             Model boxModel = LoadModelFromMesh(cubeMesh);
             const bool hasBoxModel = IsModelValid(boxModel);
             
@@ -179,19 +146,93 @@ void BulletPhysicsScene::createFallingBoxes() {
             const float hue = static_cast<float>(boxIndex) / static_cast<float>(kBoxCount);
             const Color boxColor = ColorFromHSV(hue * 360.0F, 0.8F, 0.9F);
             
-            // Store physics object
-            PhysicsObject boxObj;
-            boxObj.rigidBody = boxRigidBody;
-            boxObj.collisionShape = boxShape;
-            boxObj.motionState = boxMotionState;
-            boxObj.model = boxModel;
-            boxObj.hasModel = hasBoxModel;
-            boxObj.color = boxColor;
-            physicsObjects.push_back(boxObj);
+            // Create box entity
+            const Vector3 boxPosition{posX, kStartHeight, posZ};
+            createPhysicsEntity(
+                boxPosition,
+                boxShape,
+                kBoxMass,
+                hasBoxModel,
+                boxModel,
+                boxColor,
+                false  // not ground
+            );
             
             ++boxIndex;
         }
     }
+}
+
+entt::entity BulletPhysicsScene::createPhysicsEntity(
+    const Vector3& position,
+    btCollisionShape* collisionShape,
+    float mass,
+    bool hasModel,
+    const Model& model,
+    const Color& color,
+    bool isGround
+) {
+    // Create entity
+    const auto entity = registry.create();
+    
+    // Add Transform component
+    auto& transform = registry.emplace<Transform>(entity);
+    transform.position = position;
+    transform.rotation = Quaternion{0.0F, 0.0F, 0.0F, 1.0F};  // Identity quaternion (x, y, z, w)
+    transform.scale = Vector3{1.0F, 1.0F, 1.0F};
+    
+    // Setup Bullet Physics transform
+    btTransform bulletTransform;
+    bulletTransform.setIdentity();
+    bulletTransform.setOrigin(btVector3(position.x, position.y, position.z));
+    
+    // Calculate inertia
+    btVector3 localInertia(0.0, 0.0, 0.0);
+    const bool isStatic = (mass == 0.0F);
+    if (!isStatic) {
+        collisionShape->calculateLocalInertia(mass, localInertia);
+    }
+    
+    // Create motion state
+    btDefaultMotionState* motionState = new btDefaultMotionState(bulletTransform);
+    
+    // Create rigid body
+    btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(
+        mass,
+        motionState,
+        collisionShape,
+        localInertia
+    );
+    
+    btRigidBody* rigidBody = new btRigidBody(rigidBodyCI);
+    
+    // Add rigid body to physics world
+    if (dynamicsWorld != nullptr) {
+        dynamicsWorld->addRigidBody(rigidBody);
+    }
+    
+    // Add PhysicsBody component
+    auto& physicsBody = registry.emplace<PhysicsBody>(entity);
+    physicsBody.rigidBody = rigidBody;
+    physicsBody.collisionShape = collisionShape;
+    physicsBody.motionState = motionState;
+    physicsBody.mass = mass;
+    physicsBody.isStatic = isStatic;
+    
+    // Add Renderable component if model is provided
+    if (hasModel) {
+        auto& renderable = registry.emplace<Renderable>(entity);
+        renderable.model = model;
+        renderable.color = color;
+        renderable.hasModel = IsModelValid(model);
+    }
+    
+    // Add Ground tag if this is ground
+    if (isGround) {
+        registry.emplace<Ground>(entity);
+    }
+    
+    return entity;
 }
 
 void BulletPhysicsScene::update() {
@@ -199,13 +240,9 @@ void BulletPhysicsScene::update() {
         return;
     }
     
-    // Step the physics simulation
-    // Use fixed timestep for consistent physics
-    constexpr float kFixedTimeStep = 1.0F / 60.0F;
-    constexpr int kMaxSubSteps = 10;
+    // Update physics system (steps simulation and syncs transforms)
     const float deltaTime = GetFrameTime();
-    
-    dynamicsWorld->stepSimulation(deltaTime, kMaxSubSteps);
+    PhysicsSystem::update(registry, dynamicsWorld, deltaTime);
 }
 
 void BulletPhysicsScene::draw() const {
@@ -213,83 +250,26 @@ void BulletPhysicsScene::draw() const {
         return;
     }
     
-    // Draw ground plane
-    if (hasGroundModel) {
-        constexpr Vector3 kGroundPosition = {0.0F, -0.5F, 0.0F};
-        constexpr Vector3 kGroundScale = {40.0F, 1.0F, 40.0F};
-        DrawModelEx(groundModel, kGroundPosition, Vector3{0.0F, 1.0F, 0.0F}, 0.0F, kGroundScale, DARKGREEN);
-    }
+    // Draw ground entities first
+    RenderSystem::drawGround(registry);
     
-    // Draw physics objects
-    for (const auto& obj : physicsObjects) {
-        if (obj.rigidBody == nullptr || !obj.hasModel) {
-            continue;
-        }
-        
-        // Get transform from Bullet
-        btTransform transform;
-        if (obj.rigidBody->getMotionState()) {
-            obj.rigidBody->getMotionState()->getWorldTransform(transform);
-        } else {
-            transform = obj.rigidBody->getWorldTransform();
-        }
-        
-        // Convert Bullet transform to raylib
-        const btVector3& origin = transform.getOrigin();
-        const Vector3 position = Vector3{
-            static_cast<float>(origin.x()),
-            static_cast<float>(origin.y()),
-            static_cast<float>(origin.z())
-        };
-        
-        // Get rotation from Bullet quaternion
-        const btQuaternion& rotation = transform.getRotation();
-        const Quaternion quat = Quaternion{
-            static_cast<float>(rotation.x()),
-            static_cast<float>(rotation.y()),
-            static_cast<float>(rotation.z()),
-            static_cast<float>(rotation.w())
-        };
-        
-        // Convert quaternion to axis-angle for DrawModelEx
-        const Vector3 rotationAxis = Vector3Normalize(Vector3{quat.x, quat.y, quat.z});
-        const float rotationAngle = 2.0F * acosf(quat.w);
-        
-        // Draw the model
-        constexpr float kBoxScale = 1.0F;
-        DrawModelEx(obj.model, position, rotationAxis, rotationAngle, Vector3{kBoxScale, kBoxScale, kBoxScale}, obj.color);
-        
-        // Draw wireframe
+    // Draw all other renderable entities
+    RenderSystem::draw(registry);
+    
+    // Draw wireframes for physics objects (optional visual aid)
+    auto view = registry.view<const Transform, const PhysicsBody>(entt::exclude<Ground>);
+    for (auto entity : view) {
+        const auto& transform = view.get<Transform>(entity);
         constexpr float kBoxSize = 0.5F;
-        DrawCubeWiresV(position, Vector3{kBoxSize * 2.0F, kBoxSize * 2.0F, kBoxSize * 2.0F}, DARKGRAY);
+        DrawCubeWiresV(
+            transform.position,
+            Vector3{kBoxSize * 2.0F, kBoxSize * 2.0F, kBoxSize * 2.0F},
+            DARKGRAY
+        );
     }
 }
 
 void BulletPhysicsScene::cleanupPhysicsWorld() {
-    // Remove and delete all rigid bodies
-    for (auto& obj : physicsObjects) {
-        if (obj.rigidBody != nullptr && dynamicsWorld != nullptr) {
-            dynamicsWorld->removeRigidBody(obj.rigidBody);
-        }
-        
-        if (obj.rigidBody != nullptr) {
-            delete obj.rigidBody;
-            obj.rigidBody = nullptr;
-        }
-        
-        if (obj.motionState != nullptr) {
-            delete obj.motionState;
-            obj.motionState = nullptr;
-        }
-        
-        if (obj.collisionShape != nullptr) {
-            delete obj.collisionShape;
-            obj.collisionShape = nullptr;
-        }
-    }
-    
-    physicsObjects.clear();
-    
     // Delete dynamics world components
     if (dynamicsWorld != nullptr) {
         delete dynamicsWorld;
@@ -318,4 +298,3 @@ void BulletPhysicsScene::cleanupPhysicsWorld() {
 }
 
 } // namespace project
-
