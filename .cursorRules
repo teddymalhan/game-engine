@@ -31,6 +31,7 @@ This ensures implementations follow official documentation, use correct APIs, an
 - Follow **type safety** and **RAII** principles throughout the codebase.
 - Follow the **One Definition Rule (ODR)** and avoid violating it with headers, inline functions, or templates.
 - All new code should be **warning-free** under a strict warning set (e.g. `-Wall -Wextra -Wpedantic` or MSVC equivalent). Treat warnings as errors where possible.
+- Adhere to **SOLID principles**, practice **clean code** methodologies, and design for **extensibility**. **Maintain a source of truth** in the form of a **PlantUML UML diagram** that is updated **every time you iterate** on the design or implementation, ensuring the diagram accurately reflects the current architecture, class relationships, and system structure.
 
 ---
 
