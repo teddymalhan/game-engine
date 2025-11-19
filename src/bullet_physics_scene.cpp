@@ -18,7 +18,6 @@ void BulletPhysicsScene::initialize() {
     
     setupPhysicsWorld();
     createGroundPlane();
-    createFallingBoxes();
     createCharacter();
     
     isInitialized = true;
@@ -166,8 +165,9 @@ void BulletPhysicsScene::createFallingBoxes() {
 
 void BulletPhysicsScene::createCharacter() {
     constexpr const char* kCharacterPath = "assets/characters/character-a.glb";
-    constexpr float kCharacterMass = 1.0F;
-    constexpr float kCharacterStartHeight = 3.0F;
+    constexpr float kCharacterMass = 0.0F;  // Static (doesn't fall)
+    constexpr float kCharacterDistance = 5.0F;  // Distance from origin (camera looks at origin)
+    constexpr float kGroundY = -0.0F;  // Ground plane Y position
     
     // Check if model file exists
     if (!FileExists(kCharacterPath)) {
@@ -198,8 +198,13 @@ void BulletPhysicsScene::createCharacter() {
         static_cast<btScalar>(capsuleHeight)
     );
     
-    // Create character entity
-    const Vector3 characterPosition{0.0F, kCharacterStartHeight, 0.0F};
+    // Position character on the ground, away from camera
+    // Camera is at (2, 1.5, 2) looking at (0, 0, 0)
+    // Place character in front of camera view, on the ground
+    // Ground is at Y = -0.5, so character center should be at ground level + half capsule height
+    const float characterY = kGroundY + (capsuleHeight * 0.5F) + capsuleRadius;
+    const Vector3 characterPosition{0.0F, characterY, -kCharacterDistance};
+    
     const auto characterEntity = createPhysicsEntity(
         characterPosition,
         capsuleShape,

@@ -46,11 +46,6 @@ namespace {
         
         #pragma unroll
         while (!WindowShouldClose()) {
-            // Handle keyboard input for scene switching
-            if (IsKeyPressed(kKeySwitchScene)) {
-                sceneManager.switchToNextScene();
-            }
-            
             // Update first-person camera (WASD movement + mouse look)
             UpdateCamera(&camera, CAMERA_FIRST_PERSON);
             
@@ -89,8 +84,6 @@ namespace {
             
             DrawText("3D Scene Example - First Person Camera", kTextPosX, kTextPosY, kTextFontSize, DARKGRAY);
             DrawText("WASD: Move | Mouse: Look around", kTextPosX, kTextPosY + kTextLineSpacing, kTextFontSize, DARKGRAY);
-            DrawText(sceneInfo.c_str(), kTextPosX, kTextPosY + (kTextLineSpacing * 2), kTextFontSize, DARKGRAY);
-            DrawText("Press TAB to switch scenes", kTextPosX, kTextPosY + (kTextLineSpacing * 3), kTextFontSize, DARKGRAY);
             
             EndDrawing();
         }
@@ -111,28 +104,10 @@ int main() {
     // Create scene manager to handle multiple scenes (Strategy pattern)
     project::SceneManager sceneManager;
     
-    // Register the tree scene (original scene)
-    if (FileExists(kModelPath)) {
-        auto treeScene = std::make_unique<project::TreeScene>(kModelPath);
-        sceneManager.registerScene(std::move(treeScene));
-        std::cout << "Registered Tree Scene\n";
-    } else {
-        std::cerr << "Warning: Model file not found: " << kModelPath << '\n';
-        std::cerr << "Tree Scene will not be available\n";
-    }
-    
-    // Register the geometric scene (new scene)
-    auto geometricScene = std::make_unique<project::GeometricScene>();
-    sceneManager.registerScene(std::move(geometricScene));
-    std::cout << "Registered Geometric Scene\n";
-    
-    // Register the Bullet Physics scene
+    // Register only the Bullet Physics scene
     auto bulletPhysicsScene = std::make_unique<project::BulletPhysicsScene>();
     sceneManager.registerScene(std::move(bulletPhysicsScene));
     std::cout << "Registered Bullet Physics Scene\n";
-    
-    std::cout << "Total scenes registered: " << sceneManager.getSceneCount() << '\n';
-    std::cout << "Press TAB to switch between scenes\n";
     
     runGameLoop(camera, sceneManager);
     
