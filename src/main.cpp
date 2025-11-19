@@ -41,14 +41,17 @@ namespace {
     void runGameLoop(Camera3D& camera, project::SceneManager& sceneManager) {
         SetTargetFPS(kTargetFPS);
         
+        // Disable cursor for first-person camera
+        DisableCursor();
+        
         while (!WindowShouldClose()) {
             // Handle keyboard input for scene switching
             if (IsKeyPressed(kKeySwitchScene)) {
                 sceneManager.switchToNextScene();
             }
             
-            // Update camera
-            UpdateCamera(&camera, CAMERA_ORBITAL);
+            // Update first-person camera (WASD movement + mouse look)
+            UpdateCamera(&camera, CAMERA_FIRST_PERSON);
             
             // Update current scene
             sceneManager.update();
@@ -83,9 +86,10 @@ namespace {
                                          std::to_string(currentIndex + 1) + 
                                          "/" + std::to_string(sceneCount) + ")";
             
-            DrawText("3D Scene Example - Use mouse to orbit camera", kTextPosX, kTextPosY, kTextFontSize, DARKGRAY);
-            DrawText(sceneInfo.c_str(), kTextPosX, kTextPosY + kTextLineSpacing, kTextFontSize, DARKGRAY);
-            DrawText(("Press TAB to switch scenes"), kTextPosX, kTextPosY + (kTextLineSpacing * 2), kTextFontSize, DARKGRAY);
+            DrawText("3D Scene Example - First Person Camera", kTextPosX, kTextPosY, kTextFontSize, DARKGRAY);
+            DrawText("WASD: Move | Mouse: Look around", kTextPosX, kTextPosY + kTextLineSpacing, kTextFontSize, DARKGRAY);
+            DrawText(sceneInfo.c_str(), kTextPosX, kTextPosY + (kTextLineSpacing * 2), kTextFontSize, DARKGRAY);
+            DrawText("Press TAB to switch scenes", kTextPosX, kTextPosY + (kTextLineSpacing * 3), kTextFontSize, DARKGRAY);
             
             EndDrawing();
         }
