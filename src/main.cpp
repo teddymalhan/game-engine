@@ -3,6 +3,7 @@
 #include <project/scene_manager.hpp>
 #include <project/tree_scene.hpp>
 #include <project/geometric_scene.hpp>
+#include <project/bullet_physics_scene.hpp>
 #include <iostream>
 #include <memory>
 
@@ -119,6 +120,11 @@ int main() {
     auto geometricScene = std::make_unique<project::GeometricScene>();
     sceneManager.registerScene(std::move(geometricScene));
     std::cout << "Registered Geometric Scene\n";
+    
+    // Register the Bullet Physics scene
+    auto bulletPhysicsScene = std::make_unique<project::BulletPhysicsScene>();
+    sceneManager.registerScene(std::move(bulletPhysicsScene));
+    std::cout << "Registered Bullet Physics Scene\n";
     
     std::cout << "Total scenes registered: " << sceneManager.getSceneCount() << '\n';
     std::cout << "Press TAB to switch between scenes\n";

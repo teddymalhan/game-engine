@@ -231,6 +231,75 @@ if(${PROJECT_NAME}_BUILD_EXECUTABLE AND ${PROJECT_NAME}_ENABLE_UNIT_TESTING)
   endif()
 endif()
 
+# Bullet Physics configuration
+if(APPLE)
+  # Find Bullet Physics via Homebrew
+  set(BULLET_ROOT "/opt/homebrew/opt/bullet")
+  if(EXISTS ${BULLET_ROOT})
+    target_include_directories(
+      ${PROJECT_NAME}
+      PRIVATE
+      ${BULLET_ROOT}/include
+      ${BULLET_ROOT}/include/bullet
+    )
+    
+    target_link_directories(
+      ${PROJECT_NAME}
+      PRIVATE
+      ${BULLET_ROOT}/lib
+    )
+    
+    # Link Bullet Physics libraries (static versions)
+    target_link_libraries(
+      ${PROJECT_NAME}
+      PRIVATE
+      BulletDynamics
+      BulletCollision
+      LinearMath
+    )
+    
+    message(STATUS "Found Bullet Physics at: ${BULLET_ROOT}")
+    
+    # Also add Bullet to library target if unit testing is enabled
+    if(${PROJECT_NAME}_BUILD_EXECUTABLE AND ${PROJECT_NAME}_ENABLE_UNIT_TESTING)
+      target_include_directories(
+        ${PROJECT_NAME}_LIB
+        PRIVATE
+        ${BULLET_ROOT}/include
+        ${BULLET_ROOT}/include/bullet
+      )
+      
+      target_link_directories(
+        ${PROJECT_NAME}_LIB
+        PRIVATE
+        ${BULLET_ROOT}/lib
+      )
+      
+      target_link_libraries(
+        ${PROJECT_NAME}_LIB
+        PRIVATE
+        BulletDynamics
+        BulletCollision
+        LinearMath
+      )
+    endif()
+  else()
+    message(WARNING "Bullet Physics not found at ${BULLET_ROOT}. Please install via: brew install bullet")
+  endif()
+elseif(UNIX)
+  # Linux: try to find Bullet via pkg-config or standard paths
+  find_package(PkgConfig QUIET)
+  if(PkgConfig_FOUND)
+    pkg_check_modules(BULLET QUIET bullet)
+    if(BULLET_FOUND)
+      target_include_directories(${PROJECT_NAME} PRIVATE ${BULLET_INCLUDE_DIRS})
+      target_link_directories(${PROJECT_NAME} PRIVATE ${BULLET_LIBRARY_DIRS})
+      target_link_libraries(${PROJECT_NAME} PRIVATE ${BULLET_LIBRARIES})
+      message(STATUS "Found Bullet Physics via pkg-config")
+    endif()
+  endif()
+endif()
+
 # For Windows, it is necessary to link with the MultiThreaded library.
 # Depending on how the rest of the project's dependencies are linked, it might be necessary
 # to change the line to statically link with the library.

@@ -9,11 +9,12 @@ alwaysApply: true
 
 **FIRST AND FOREMOST**: Before implementing any feature or functionality, especially when working with:
 - **raylib** library functions, types, or patterns
+- **bulletphysics** library functions, types, or patterns
 - **C++ standard library** features or idioms
 - **Modern C++** patterns or best practices
 
 **ALWAYS** use the **context7 MCP server** to:
-1. **Resolve library IDs** using `mcp_context7_resolve-library-id` for raylib or relevant C++ libraries
+1. **Resolve library IDs** using `mcp_context7_resolve-library-id` for raylib, bulletphysics, or relevant C++ libraries
 2. **Fetch up-to-date documentation** using `mcp_context7_get-library-docs` with the resolved library ID
 3. **Review official examples and patterns** before writing implementation code
 4. **Verify correct API usage** and parameter types

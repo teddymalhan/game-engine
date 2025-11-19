@@ -4,6 +4,7 @@ set(sources
     src/scene_manager.cpp
     src/tree_scene.cpp
     src/geometric_scene.cpp
+    src/bullet_physics_scene.cpp
 )
 
 set(exe_sources
@@ -18,6 +19,7 @@ set(headers
     include/project/scene_manager.hpp
     include/project/tree_scene.hpp
     include/project/geometric_scene.hpp
+    include/project/bullet_physics_scene.hpp
 )
 
 set(test_sources
