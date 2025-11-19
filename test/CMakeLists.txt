@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.20)
 
 #
 # Project details
@@ -19,7 +19,7 @@ foreach(file ${test_sources})
   # Set the compiler standard
   #
 
-  target_compile_features(${test_name}_Tests PUBLIC cxx_std_17)
+  target_compile_features(${test_name}_Tests PUBLIC cxx_std_23)
 
   #
   # Setup code coverage if enabled

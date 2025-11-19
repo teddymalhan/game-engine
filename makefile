@@ -1,6 +1,6 @@
 COMPILER = clang++
 SOURCE_LIBS = -Ilib/
-MACOS_OPT = -std=c++17 -Llib/ -framework CoreVideo -framework IOKit -framework Cocoa -framework GLUT -framework OpenGL lib/libraylib.a
+MACOS_OPT = -std=c++23 -Llib/ -framework CoreVideo -framework IOKit -framework Cocoa -framework GLUT -framework OpenGL lib/libraylib.a
 MACOS_OUT = -o "bin/build_osx"
 CFILES = src/main.cpp
 

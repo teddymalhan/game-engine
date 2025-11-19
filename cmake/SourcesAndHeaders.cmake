@@ -1,5 +1,6 @@
 set(sources
     src/tmp.cpp
+    src/scene.cpp
 )
 
 set(exe_sources
@@ -9,6 +10,7 @@ set(exe_sources
 
 set(headers
     include/project/tmp.hpp
+    include/project/scene.hpp
 )
 
 set(test_sources

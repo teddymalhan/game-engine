@@ -1,11 +1,12 @@
 #include <raylib.h>
 #include <raymath.h>
+#include <project/scene.hpp>
 #include <iostream>
 
 namespace {
     constexpr int kWindowWidth = 800;
     constexpr int kWindowHeight = 600;
-    constexpr const char* kWindowTitle = "Raylib 3D Model Viewer";
+    constexpr const char* kWindowTitle = "Raylib 3D Scene Example";
     constexpr const char* kModelPath = "assets/retrourban/tree-small.glb";
     
     constexpr float kCameraPositionX = 2.0F;
@@ -23,6 +24,7 @@ namespace {
     constexpr int kTextPosX = 10;
     constexpr int kTextPosY = 40;
     constexpr int kTextFontSize = 20;
+    constexpr int kTextLineSpacing = 30;
 
     Camera3D createCamera() {
         Camera3D camera{};
@@ -34,10 +36,9 @@ namespace {
         return camera;
     }
 
-    void runGameLoop(Camera3D& camera, const Model& model) {
+    void runGameLoop(Camera3D& camera, project::Scene& scene) {
         SetTargetFPS(kTargetFPS);
         
-        #pragma unroll
         while (!WindowShouldClose()) {
             // Update camera
             UpdateCamera(&camera, CAMERA_ORBITAL);
@@ -52,12 +53,8 @@ namespace {
             DrawCube(Vector3{ kTestCubePosX, 0.0F, 0.0F }, kTestCubeSize, kTestCubeSize, kTestCubeSize, RED);
             DrawCubeWires(Vector3{ kTestCubePosX, 0.0F, 0.0F }, kTestCubeSize, kTestCubeSize, kTestCubeSize, MAROON);
             
-            // Draw the model at origin
-            DrawModel(model, Vector3{ 0.0F, 0.0F, 0.0F }, kModelScale, WHITE);
-            
-            // Draw model bounding box for debugging
-            BoundingBox bounds = GetModelBoundingBox(model);
-            DrawBoundingBox(bounds, GREEN);
+            // Draw the entire scene (all objects)
+            scene.draw();
             
             // Draw a grid for reference
             DrawGrid(kGridSlices, kGridSpacing);
@@ -71,7 +68,9 @@ namespace {
             
             // Draw UI
             DrawFPS(kFpsPosX, kFpsPosY);
-            DrawText("3D Model Viewer - Use mouse to orbit camera", kTextPosX, kTextPosY, kTextFontSize, DARKGRAY);
+            DrawText("3D Scene Example - Use mouse to orbit camera", kTextPosX, kTextPosY, kTextFontSize, DARKGRAY);
+            DrawText(("Objects in scene: " + std::to_string(scene.getObjectCount())).c_str(), 
+                     kTextPosX, kTextPosY + kTextLineSpacing, kTextFontSize, DARKGRAY);
             
             EndDrawing();
         }
@@ -96,6 +95,9 @@ int main() {
     // Set up 3D camera
     Camera3D camera = createCamera();
     
+    // Create a scene to manage multiple objects
+    project::Scene scene;
+    
     // Load the 3D model
     std::cout << "Loading model: " << kModelPath << '\n';
     Model model = LoadModel(kModelPath);
@@ -116,10 +118,20 @@ int main() {
     std::cout << "Model bounds - Min: (" << bounds.min.x << ", " << bounds.min.y << ", " << bounds.min.z << ")\n";
     std::cout << "Model bounds - Max: (" << bounds.max.x << ", " << bounds.max.y << ", " << bounds.max.z << ")\n";
     
-    runGameLoop(camera, model);
+    // Add the model to the scene at the origin
+    const size_t objectIndex = scene.addObject(model, Vector3{0.0F, 0.0F, 0.0F}, kModelScale, "tree-main");
+    (void)objectIndex;  // Suppress unused variable warning
     
-    // Cleanup
-    UnloadModel(model);
+    // Example: Add multiple instances of the same model at different positions
+    // (Note: In a real scenario, you'd want to load the model multiple times or use instancing)
+    // For now, we'll just add one object. You can add more like this:
+    // scene.addObject(anotherModel, Vector3{2.0F, 0.0F, 0.0F}, 1.0F, "tree-2");
+    
+    std::cout << "Scene created with " << scene.getObjectCount() << " object(s)\n";
+    
+    runGameLoop(camera, scene);
+    
+    // Cleanup - Scene destructor will handle unloading models
     CloseWindow();
     return 0;
 }
