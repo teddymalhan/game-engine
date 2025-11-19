@@ -1,0 +1,285 @@
+---
+description: Modern C++23 coding guidelines
+globs: **/*.c,**/*.cpp,**/*.h,**/*.hpp,**/*.cxx,CMakeLists.txt,*.cmake,conanfile.txt,Makefile,**/*.cc
+alwaysApply: true
+---
+# C++23 Programming Guidelines
+
+## Documentation & Implementation Priority
+
+**FIRST AND FOREMOST**: Before implementing any feature or functionality, especially when working with:
+- **raylib** library functions, types, or patterns
+- **C++ standard library** features or idioms
+- **Modern C++** patterns or best practices
+
+**ALWAYS** use the **context7 MCP server** to:
+1. **Resolve library IDs** using `mcp_context7_resolve-library-id` for raylib or relevant C++ libraries
+2. **Fetch up-to-date documentation** using `mcp_context7_get-library-docs` with the resolved library ID
+3. **Review official examples and patterns** before writing implementation code
+4. **Verify correct API usage** and parameter types
+
+This ensures implementations follow official documentation, use correct APIs, and adhere to library best practices. Only proceed with implementation after consulting context7 documentation, or if context7 is unavailable for the specific library/topic.
+
+---
+
+## General Principles
+
+- Write **modern C++ (C++20/23)**, not "C with classes".
+- Prefer **clarity over cleverness**; optimize for readability and maintainability first.
+- Use **English** for all code, comments, and documentation.
+- Prefer **standard library** and **well-known patterns** over custom reinventions.
+- Follow **type safety** and **RAII** principles throughout the codebase.
+- Follow the **One Definition Rule (ODR)** and avoid violating it with headers, inline functions, or templates.
+- All new code should be **warning-free** under a strict warning set (e.g. `-Wall -Wextra -Wpedantic` or MSVC equivalent). Treat warnings as errors where possible.
+
+---
+
+## Naming & Style
+
+- **Files & directories**: `snake_case`, e.g. `user_manager.cpp`, `http_server/`.
+- **Namespaces**: `snake_case`, e.g. `core`, `core::utils`, `http_server::detail`.
+- **Types (classes, structs, enums, concepts)**: `PascalCase`, e.g. `UserManager`, `ConnectionPool`, `UserId`.
+- **Variables / functions / methods**: `camelCase`, e.g. `userCount`, `loadUser`, `computeHash`.
+- **Constants**:
+  - Compile-time constants: `constexpr` variables in `PascalCase` or `kPascalCase` (team choice; be consistent).
+  - Macros (if unavoidable): `ALL_CAPS_SNAKE_CASE`.
+- **Booleans**: use verbs or predicates: `isValid`, `hasError`, `canRetry`, `shouldExit`.
+- **Functions**:
+  - Start with a verb: `loadUsers`, `updateCache`, `computeSum`, `toString`.
+  - For `bool` return: `isX`, `hasX`, `canX`, `shouldX`.
+  - For `void`: `executeX`, `saveX`, `logX`, `notifyX`.
+- **Avoid abbreviations** except:
+  - Common ones: `API`, `URL`, `ID`, `JSON`, etc.
+  - Loop indices: `i`, `j`, `k`.
+  - Short, well-known: `err`, `ctx`, `req`, `res`.
+- Avoid “magic numbers”: introduce named `constexpr` variables or scoped enums.
+
+---
+
+## Functions
+
+- Strive for **single-responsibility, small functions**:
+  - Prefer ≤ ~20 logical statements.
+  - If a function is long, split into helpers with clear names.
+- **Avoid deep nesting**:
+  - Use early returns for error handling and guard clauses.
+  - Extract nested logic into separate functions/lambdas.
+- **Parameter count**:
+  - Prefer ≤ ~4–5 parameters.
+  - When exceeding this, group logically related arguments into a struct/class (`Config`/`Params` object).
+- **Parameter passing**:
+  - Small trivially copyable types (ints, small structs): pass by value.
+  - Larger objects: `const T&` for read-only, `T&` for mutation.
+  - Use `std::span<T>` or `std::span<const T>` for array-like parameters instead of raw pointers/`size` pairs where possible.
+- **Return values**:
+  - Prefer returning values instead of using output parameters.
+  - Use `[[nodiscard]]` for functions where ignoring the result is almost always a bug.
+- **Default arguments**:
+  - Prefer default parameters over passing sentinel values like `nullptr` or `-1`.
+- **C++23 features**:
+  - Use **`ranges` algorithms** (`std::ranges::find`, `std::ranges::sort`) when appropriate.
+  - Consider **`constexpr` functions** for logic that can be evaluated at compile time.
+  - Use **`[[likely]]` / `[[unlikely]]`** for clear, performance-critical hot/cold branches (sparingly).
+
+---
+
+## Types & Data Modeling
+
+- Don’t overuse primitives; create **strong types**:
+  - Wrap IDs, units, and domain concepts in dedicated types (`UserId`, `Meters`, `Milliseconds`) instead of raw `int`/`double`.
+- Prefer **immutability**:
+  - Make data `const` whenever feasible.
+  - Make members `const` when they conceptually never change after construction.
+- Use **scoped enums** (`enum class`) instead of unscoped `enum`.
+- Prefer **`std::optional<T>`** when:
+  - A value may or may not be present.
+  - Avoid using `nullptr`, magic sentinels, or `std::nullopt` as data values.
+- Use **`std::variant`** or **`std::expected` (C++23)** for sum types / discriminated unions and error-or-value returns.
+- Use **`std::string` / `std::string_view`**:
+  - Use `std::string_view` for non-owning string parameters that don’t outlive the call.
+  - Avoid `char*` and C-style strings except at library boundaries.
+
+---
+
+## Classes, Structs, and Object Design
+
+- Use **structs** for simple passive data aggregates with all-public members.
+- Use **classes** when:
+  - You need invariants, encapsulation, or behavior.
+  - You want to hide implementation details.
+- Encapsulation:
+  - Make data members `private` by default.
+  - Expose behavior, not representation. Add getters/setters only when needed and with meaningful names (`setTimeout`, not just `setX`).
+- Size & complexity:
+  - Aim for **small, focused classes**:
+    - Single clear responsibility (SRP).
+    - Preferably ≤ ~10 public methods.
+    - Preferably ≤ ~10 data members.
+- **Rule of Zero / Five**:
+  - Prefer **Rule of Zero**: rely on standard RAII types (`std::vector`, `std::string`, smart pointers). Don’t define special member functions if you don’t own resources.
+  - If you manage resources manually, follow **Rule of Five**: define (or `=delete`/`=default`) constructor, destructor, copy/move constructor, copy/move assignment.
+- Special member functions:
+  - Use `=default` where the compiler-generated behavior is correct and desired.
+  - Use `=delete` to disable unwanted operations (e.g. non-copyable types).
+- **Const-correctness**:
+  - Mark member functions `const` when they don’t modify observable state.
+  - Prefer logically `const` behavior; avoid mutating `mutable` state except for caches with care.
+
+---
+
+## Templates, Concepts, and Generic Code
+
+- Use templates when you truly need **generic behavior**, not just to avoid writing two functions.
+- Prefer **function templates** and **`auto` parameters** (`template <typename T>`, or C++20 abbreviated templates) for generic utilities.
+- Use **concepts** to constrain templates:
+  - Prefer `requires` clauses or `std::ranges`/`std::integral`/`std::floating_point` concepts to document and enforce valid template arguments.
+  - Avoid old-style SFINAE unless necessary.
+- Keep template error messages manageable:
+  - Minimize deeply nested template logic in headers.
+  - Consider `static_assert` with clear messages for invalid template arguments.
+- Place **template definitions in headers**, or in header-only pattern files used consistently.
+
+---
+
+## Error Handling & Exceptions
+
+- Use exceptions for **unexpected, exceptional conditions** (e.g. I/O failures, invariants violated).
+- For **expected failures**, prefer:
+  - `std::optional<T>` when “value or nothing” is enough.
+  - `std::expected<T, E>` (C++23) or a similar result type when returning an error code or error object.
+- When catching:
+  - Catch by `const&` (e.g. `const std::exception&`).
+  - Only catch where you can **handle or translate** the error:
+    - Fix/repair state.
+    - Add context (`throw MyError("while loading config", std::move(e));`).
+    - Perform cleanup that cannot be done via RAII.
+- Avoid using exceptions for control flow.
+- Mark functions `noexcept` when they are guaranteed not to throw; this enables optimizations, especially for move operations and destructors.
+- For low-level or performance-critical code, carefully evaluate exception usage vs. error-return types and document the chosen pattern.
+
+---
+
+## Memory Management & RAII
+
+- Prefer **automatic storage** and **standard containers**:
+  - Use `std::vector`, `std::array`, `std::string`, `std::unordered_map`, etc.
+  - Avoid manual `new`/`delete`, `new[]`/`delete[]`. They should almost never appear in high-level code.
+- Use **smart pointers**:
+  - `std::unique_ptr<T>` for exclusive ownership.
+  - `std::shared_ptr<T>` only when shared ownership is truly required.
+  - `std::weak_ptr<T>` to break reference cycles or hold non-owning references to shared objects.
+- RAII:
+  - Wrap every acquired resource (file handles, mutexes, sockets, DB connections) in an RAII object that releases it in its destructor.
+  - Avoid “naked” resource acquisition and `try`/`catch`-based manual cleanup; rely on destructors.
+- Avoid raw owning pointers:
+  - Raw pointers should be non-owning observers, or used only at boundaries/interop.
+
+---
+
+## Standard Library Use (C++23)
+
+- Prefer **standard facilities** to custom ones:
+  - Containers: `std::vector`, `std::deque`, `std::array`, `std::map`, `std::unordered_map`, `std::set`, etc.
+  - Algorithms: `std::ranges` algorithms where possible (`std::ranges::for_each`, `std::ranges::transform`, `std::ranges::find`).
+  - Time: `std::chrono` for timers, durations, timestamps.
+  - Filesystem: `std::filesystem::path` and related utilities for file operations.
+  - Optional, variant, any, expected: `std::optional`, `std::variant`, `std::any`, `std::expected`.
+- Prefer non-member, non-friend operators and functions when appropriate to preserve encapsulation.
+
+---
+
+## Concurrency & Parallelism
+
+- Prefer **task-based models** over manual thread management when possible:
+  - Use `std::jthread`, `std::async`, or thread pools instead of raw `std::thread` where appropriate.
+- Synchronization:
+  - Use `std::mutex`, `std::shared_mutex`, `std::lock_guard`, `std::scoped_lock` to protect shared data.
+  - Use **RAII** lock wrappers; avoid manual `lock`/`unlock`.
+- Atomic operations:
+  - Use `std::atomic<T>` for lock-free operations where needed.
+  - Avoid data races by ensuring exactly one synchronization strategy is used consistently for each shared object.
+- Don’t expose **shared mutable state** freely:
+  - Prefer message passing, immutability, or copy-on-write patterns where it simplifies reasoning.
+- For performance-critical concurrency, carefully document invariants, ownership, and synchronization strategy.
+
+---
+
+## Coroutines (if used)
+
+- Use **C++20 coroutines** (e.g. `co_await`, `co_yield`) only with clear supporting abstractions (e.g. async runtime, generator types).
+- Keep coroutine logic readable; treat them like state machines with clear life cycle.
+- Avoid mixing coroutines with raw threads without a clear model.
+
+---
+
+## Modules and Build Structure (C++20/23)
+
+- Prefer **modules** for new libraries where toolchain allows:
+  - Use modules to reduce compile times and improve encapsulation.
+  - Avoid cyclic dependencies by design; modules should have clear dependency directions.
+- Legacy/include-based code:
+  - Keep **headers** for declarations, **.cpp** for definitions.
+  - Use `#pragma once` or include guards in all headers.
+- Project layout:
+  - `include/` for public headers.
+  - `src/` for implementation files.
+  - `tests/` for unit and integration tests.
+  - `lib/` or `third_party/` for external libraries.
+  - `doc/` for documentation.
+- Use **CMake (or similar)**:
+  - Prefer modern CMake (`target_link_libraries`, `target_compile_features`, `target_include_directories`).
+  - Enable C++23 features via `target_compile_features(target PUBLIC cxx_std_23)` or appropriate flags.
+
+---
+
+## Testing & Quality
+
+- Write **unit tests** for public APIs and important internal behavior.
+- Follow **Arrange–Act–Assert**:
+  - Arrange test data and context.
+  - Act by invoking the code under test.
+  - Assert on expected outcomes and side effects.
+- Naming:
+  - Make test names descriptive: `loadsValidConfig`, `throwsOnMissingFile`, `respectsTimeout`.
+- Use test doubles (mocks/fakes/stubs) for dependencies:
+  - Don’t mock standard library or trivial value types.
+  - Mock external services, databases, slow or nondeterministic components.
+- Add **integration tests** for end-to-end flows and module interaction.
+- Use **static analysis and sanitizers**:
+  - Run `clang-tidy`, `cppcheck`, or similar tools where possible.
+  - Use AddressSanitizer (ASan), UndefinedBehaviorSanitizer (UBSan), etc., in debug/testing configurations.
+
+---
+
+## Documentation & Comments
+
+- Use **Doxygen-style comments** for public classes, functions, and important types:
+  - `///` or `/** ... */` describing purpose, parameters, return value, and exceptions.
+- Document **non-obvious decisions**, invariants, and assumptions.
+- Avoid redundant comments:
+  - Don’t restate what the code clearly expresses.
+  - Focus on “why”, not “what”.
+- Keep documentation close to the code; update comments when behavior changes.
+
+---
+
+## Logging & Diagnostics
+
+- Use a consistent **logging library** or facility (if available).
+- Log:
+  - High-level events.
+  - Errors and unexpected conditions.
+  - Debug information behind log levels, not via `std::cout`.
+- Avoid excessive logging in hot paths; use log levels (`debug`, `info`, `warn`, `error`) and guard logic where needed.
+
+---
+
+## Interoperability & Legacy Code
+
+- At boundaries with C or external libraries:
+  - Isolate unsafe or low-level calls in narrow, well-documented wrappers.
+  - Convert C-style APIs to safe C++ abstractions (RAII wrappers, strong types).
+- When working with legacy C++03-style code:
+  - Gradually introduce modern features when touching existing code (Boy Scout Rule: leave the code cleaner).
+
+---
